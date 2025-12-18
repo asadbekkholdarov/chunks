@@ -1,0 +1,74 @@
+import pandas as pd
+from sqlalchemy import create_engine
+from urllib.parse import quote_plus
+
+# =========================
+# CONNECTION
+# =========================
+password = quote_plus("admin123")
+engine = create_engine(
+    f"postgresql+psycopg2://postgres:{password}@localhost:5432/main_db",
+    future=True
+)
+
+excel_path = "1million.csv"
+table_name = "kadastr_data"
+
+chunk_size = 1000
+total = 0
+
+print("🚀 LOAD BOSHLANDI")
+
+# =========================
+# READ EXCEL IN CHUNKS
+# =========================
+for i, df in enumerate(
+    pd.read_csv(excel_path, chunksize=chunk_size),
+    start=1
+):
+    print(f"\n📄 CHUNK {i} | {len(df)} qator")
+
+    # =========================
+    # CLEAN COLUMN NAMES
+    # =========================
+    df.columns = (
+        df.columns
+        .str.strip()
+        .str.lower()
+        .str.replace(" ", "_")
+        .str.replace("‘", "")
+        .str.replace("’", "")
+    )
+
+    # =========================
+    # COLUMN MAPPING
+    # =========================
+    df = df.rename(columns={
+        "kadastr_raqami": "cad_number",
+        "obyekt_turi": "object_type",
+        "yer_fondi_kichik_toifalari_code": "land_subcategory_code",
+        "yer_fondi_kichik_toifalari": "land_subcategory",
+        "inn_yoki_pnfl": "inn_or_pnfl",
+        "юридик_ёки_жисмоний": "person_type",
+        "huquq_turi": "right_type",
+        "huquq_ulushi": "right_share",
+        "amaldagi_yer_maydoni_ga": "actual_area_ga",
+        "ro‘yxatdan_o‘tkazilgan_yer_maydoni_ga": "registered_area_ga"
+    })
+
+    # =========================
+    # INSERT
+    # =========================
+    df.to_sql(
+        table_name,
+        engine,
+        if_exists="append",
+        index=False,
+        method="multi",
+        chunksize=1000
+    )
+
+    total += len(df)
+    print(f"✅ Jami yuklandi: {total}")
+
+print("\n🎉 LOAD TUGADI")
